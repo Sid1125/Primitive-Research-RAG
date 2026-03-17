@@ -6,6 +6,7 @@ This project ingests PDF documents, preprocesses and chunks their text, learns s
 
 ## Table of Contents
 
+- [Quick Start](#quick-start)
 - [Overview](#overview)
 - [Key Features](#key-features)
 - [System Architecture](#system-architecture)
@@ -20,6 +21,26 @@ This project ingests PDF documents, preprocesses and chunks their text, learns s
 - [Current Capabilities](#current-capabilities)
 - [Limitations](#limitations)
 - [For Presentation or Viva](#for-presentation-or-viva)
+
+## Quick Start
+
+The fastest local setup uses **Ollama + `phi3:mini`**.
+
+```powershell
+py -3.11 -m pip install -r requirements.txt
+ollama pull phi3:mini
+py -3.11 -m main ingest
+py -3.11 -m main train
+py -3.11 -m main query "What is Amazon API Gateway?"
+```
+
+After the first `ingest` and `train`, you usually only need:
+
+```powershell
+py -3.11 -m main query "Your question here"
+```
+
+Run `ingest` again only when your PDFs change. Run `train` again when you want to rebuild the embedding model for the updated document set.
 
 ## Overview
 
@@ -69,6 +90,22 @@ Embedding + Vector Store
 Hybrid Retrieval
     ->
 LLM Answer Generation
+```
+
+### Pipeline Summary
+
+```text
+User Question
+    ->
+Query Preprocessing
+    ->
+Dense + Lexical Retrieval
+    ->
+Top Relevant Chunks
+    ->
+Ollama / API LLM
+    ->
+Grounded Final Answer
 ```
 
 ## How It Works
@@ -140,7 +177,7 @@ By default, the project runs in **hybrid RAG mode**:
 - retrieval stays local and document-grounded
 - the top retrieved chunks are compressed to fit the model context window
 - the LLM is prompted to answer only from the retrieved evidence
-- if no API key is available, the system falls back to extractive QA
+- if generation is unavailable, the system falls back to extractive QA
 
 Generation files:
 
@@ -231,6 +268,12 @@ Recommended local setup with Ollama:
 ollama pull phi3:mini
 ```
 
+Make sure the Ollama app or server is running on:
+
+```text
+http://localhost:11434
+```
+
 The default config is already set to use Ollama:
 
 ```yaml
@@ -261,6 +304,21 @@ py -3.11 -m main query "What is machine learning?"
 
 If Ollama is not running, or no API key is available for cloud providers, the system still answers using extractive fallback mode.
 
+### 7. Day-to-Day Workflow
+
+For normal use:
+
+1. put PDFs in [data/pdfs](/D:/SIC/data/pdfs)
+2. run `py -3.11 -m main ingest`
+3. run `py -3.11 -m main train`
+4. ask questions with `py -3.11 -m main query "your question"`
+
+After that:
+
+- if only the question changes, just run `query`
+- if the PDF set changes, run `ingest` again
+- if you want the custom retriever rebuilt for the new data, run `train` after `ingest`
+
 ## Usage
 
 ### Ingest
@@ -285,6 +343,12 @@ py -3.11 -m main train
 
 ```bash
 py -3.11 -m main query "What is Amazon API Gateway?"
+```
+
+Example local-Ollama query:
+
+```bash
+py -3.11 -m main query "How is RAG system quality measured?"
 ```
 
 Use top-k override:
@@ -436,6 +500,7 @@ This system is strongest at:
 - generating grounded answers from retrieved context
 - learning custom semantic embeddings from the ingested corpus
 - supporting local experimentation with retrieval and embedding settings
+- running with a lightweight local LLM through Ollama
 
 ## Limitations
 
@@ -445,7 +510,8 @@ This project is retrieval-centric, so it still has a few important limitations:
 - answer quality depends on chunk quality and reranking quality
 - very large technical PDFs can still produce imperfect ranking
 - the Siamese model learns similarity, not full reasoning
-- hybrid mode requires an external API key
+- cloud providers require an external API key
+- local Ollama answers depend on the quality and size of the selected local model
 
 ## For Presentation or Viva
 
@@ -456,6 +522,10 @@ This project is retrieval-centric, so it still has a few important limitations:
 ### Short Explanation
 
 > The system reads PDFs, preprocesses and chunks their text, learns semantic embeddings for those chunks, retrieves the most relevant passages for a question, and then uses an LLM to generate an answer strictly from the retrieved context.
+
+### Very Short Viva Version
+
+> I built a private-document RAG system. It indexes PDF content locally, retrieves the most relevant chunks using a custom embedding model plus lexical search, and then uses a lightweight LLM to generate an answer from that retrieved evidence.
 
 ### Academic Framing
 
