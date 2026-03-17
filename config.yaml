@@ -1,0 +1,55 @@
+# ============================================================
+# AI Research Agent — Central Configuration
+# ============================================================
+
+# --- Ingestion ---
+pdf_directory: "data/pdfs"
+
+# --- Chunking ---
+chunk_size: 120          # words per chunk
+chunk_overlap: 30        # overlap in words
+chunk_strategy: "sentence"  # "fixed" or "sentence" (sentence-boundary-aware)
+
+# --- NLTK ---
+nltk_data_path: null     # auto-download if null
+remove_stopwords: true
+apply_lemmatization: true
+apply_pos_tagging: true
+
+# --- Keras Embedding ---
+encoder_architecture: "bilstm"   # "bilstm", "bigru", or "cnn"
+embedding_dim: 128
+lstm_units: 64
+dense_units: 128
+max_sequence_length: 200
+vocab_size: 20000
+batch_size: 32
+epochs: 15
+model_save_path: "models/siamese_bilstm"
+min_training_window_words: 20
+min_training_window_stride: 10
+
+# --- Retrieval ---
+top_k: 5
+similarity_threshold: 0.3
+vector_store_path: "data/vectors"
+processed_chunks_path: "data/processed/chunks.json"
+rerank_multiplier: 4
+rerank_overlap_weight: 0.08
+heading_penalty: 0.2
+short_chunk_penalty: 0.08
+dense_score_weight: 0.55
+lexical_score_weight: 0.45
+
+# --- Query Rewriting ---
+enable_query_rewriting: false
+max_synonyms: 3
+
+# --- Generation ---
+mode: "extractive"       # "extractive" or "hybrid"
+llm_provider: null       # "google" or "openai" (only for hybrid)
+llm_api_key: null
+max_context_tokens: 4000 # context window limit for LLM
+
+# --- Evaluation ---
+eval_output_dir: "evaluation_results"

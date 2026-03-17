@@ -1,0 +1,17 @@
+[
+  {
+    "question": "What is RAG framework?",
+    "expected_chunks": ["test_document.pdf:4"],
+    "answer": "RAG framework combines information retrieval with private data."
+  },
+  {
+    "question": "How to evaluate RAG systems?",
+    "expected_chunks": ["test_document.pdf:5"],
+    "answer": "Quality is measured using metrics like faithfulness and hallucination detection."
+  },
+  {
+    "question": "What is deep learning?",
+    "expected_chunks": ["test_document.pdf:3"],
+    "answer": "DL is a specialized form of ML inspired by the brain."
+  }
+]

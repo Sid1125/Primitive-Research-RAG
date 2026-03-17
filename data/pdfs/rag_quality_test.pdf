@@ -1,0 +1,83 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 441 >>
+stream
+BT
+/F1 16 Tf
+/F1 18 Tf
+72 760 Td (RAG Evaluation Overview) Tj
+/F1 12 Tf
+72 732 Td (Retrieval-augmented generation systems are usually evaluated on both retrieval quality and answer quality.) Tj
+/F1 12 Tf
+72 710 Td (Common retrieval metrics include precision at k, recall at k, mean reciprocal rank, and hit rate.) Tj
+/F1 12 Tf
+72 688 Td (These metrics measure whether the system retrieves the right chunks near the top of the ranking.) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 8 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+4 0 obj
+<< /Length 395 >>
+stream
+BT
+/F1 16 Tf
+/F1 18 Tf
+72 760 Td (Answer Quality Metrics) Tj
+/F1 12 Tf
+72 732 Td (Answer quality is often measured with faithfulness, groundedness, answer relevance, and hallucination rate.) Tj
+/F1 12 Tf
+72 710 Td (A faithful answer is supported by the retrieved documents.) Tj
+/F1 12 Tf
+72 688 Td (A relevant answer directly addresses the user question without adding unsupported claims.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 8 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 354 >>
+stream
+BT
+/F1 16 Tf
+/F1 18 Tf
+72 760 Td (Practical Testing) Tj
+/F1 12 Tf
+72 732 Td (A practical RAG evaluation set usually contains curated question and answer pairs linked to expected source passages.) Tj
+/F1 12 Tf
+72 710 Td (Teams often review failure cases manually to understand whether errors come from retrieval, chunking, reranking, or generation.) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 8 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>
+endobj
+9 0 obj
+<< /Type /Catalog /Pages 8 0 R >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000577 00000 n 
+0000000703 00000 n 
+0000001149 00000 n 
+0000001275 00000 n 
+0000001680 00000 n 
+0000001806 00000 n 
+0000001875 00000 n 
+trailer
+<< /Size 10 /Root 9 0 R >>
+startxref
+1924
+%%EOF
