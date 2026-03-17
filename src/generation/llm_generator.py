@@ -1,81 +1,168 @@
 """
-LLM-based Answer Generator (Optional)
-Uses retrieved chunks as context for an external LLM.
-LLM is used ONLY for natural language generation — not retrieval or learning.
+LLM-based answer generation for the RAG pipeline.
+Uses retrieved chunks as context for an LLM.
 """
 
-from typing import List, Dict
+import os
+import json
+import urllib.error
+import urllib.request
+from typing import Dict, List
+
+from src.generation.context_optimizer import ContextOptimizer
 
 
 class LLMGenerator:
     """
-    Optional hybrid answer generation using an external LLM.
+    Hybrid answer generation using an external LLM.
 
-    Note: The LLM is used ONLY for generating human-readable answers
-    from retrieved context. All retrieval and learning is done by
-    the NLTK + Keras pipeline.
+    Retrieval stays local and document-grounded. The LLM is used to
+    synthesize a natural-language answer from retrieved context.
     """
 
     def __init__(self, config: dict):
-        self.provider = config.get("llm_provider")  # "google" or "openai"
-        self.api_key = config.get("llm_api_key")
+        self.provider = config.get("llm_provider", "openai")
+        self.api_key = (
+            config.get("llm_api_key")
+            or os.getenv("OPENAI_API_KEY")
+            or os.getenv("GOOGLE_API_KEY")
+            or os.getenv("GEMINI_API_KEY")
+        )
         self.max_context = config.get("max_context_tokens", 4000)
+        self.openai_model = config.get("openai_model", "gpt-4o-mini")
+        self.google_model = config.get("google_model", "gemini-1.5-flash")
+        self.ollama_model = config.get("ollama_model", "phi3:mini")
+        self.ollama_base_url = config.get("ollama_base_url", "http://localhost:11434")
 
     def generate(self, query: str, chunks: List[Dict]) -> Dict:
-        """
-        Generate an answer using LLM with retrieved chunks as context.
-
-        Args:
-            query: User's question.
-            chunks: Retrieved and ranked chunks.
-
-        Returns:
-            Answer dict with text, sources, confidence.
-        """
-        if not self.api_key:
+        """Generate an answer from retrieved chunks using an LLM."""
+        if not chunks:
             return {
-                "text": "API key missing. Enable hybrid mode by setting llm_api_key in config.",
+                "text": "Answer not found - no relevant passages above confidence threshold.",
                 "sources": [],
-                "confidence": 0.0
+                "confidence": 0.0,
+                "used_llm": False,
+                "fallback_reason": "no_context",
             }
 
+        if self.provider in {"openai", "google"} and not self.api_key:
+            return {
+                "text": "LLM API key missing.",
+                "sources": [],
+                "confidence": 0.0,
+                "used_llm": False,
+                "fallback_reason": "missing_api_key",
+            }
+
+        optimized_chunks = ContextOptimizer(self.max_context).optimize(chunks)
         context_parts = []
         sources = []
-        for i, chunk in enumerate(chunks, 1):
+        for i, chunk in enumerate(optimized_chunks, 1):
             src = f"{chunk.get('source', 'Unknown')} (Page {chunk.get('page', '?')})"
             context_parts.append(f"[{i}] {src}:\n{chunk.get('text', '')}")
             if src not in sources:
                 sources.append(src)
 
-        context_str = "\n\n".join(context_parts)
-        prompt = f"Context information is below.\n---------------------\n{context_str}\n---------------------\nGiven the context information and not prior knowledge, answer the query.\nQuery: {query}\nAnswer:"
+        system_prompt = (
+            "You are a document question-answering assistant. "
+            "Answer only from the provided context. "
+            "If the answer is not supported by the context, say that the answer is not available in the documents. "
+            "Start with a direct answer, then add a short explanation only if useful. "
+            "Do not invent facts and do not rely on outside knowledge."
+        )
+        user_prompt = (
+            "Use the context below to answer the question.\n\n"
+            "Context:\n"
+            "---------------------\n"
+            f"{chr(10).join(context_parts)}\n"
+            "---------------------\n"
+            f"Question: {query}\n\n"
+            "Return a concise answer grounded in the context."
+        )
 
-        answer_text = ""
         try:
             if self.provider == "google":
                 import google.generativeai as genai
+
                 genai.configure(api_key=self.api_key)
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                response = model.generate_content(prompt)
-                answer_text = response.text
+                model = genai.GenerativeModel(self.google_model)
+                response = model.generate_content([system_prompt, user_prompt])
+                answer_text = (response.text or "").strip()
             elif self.provider == "openai":
                 import openai
+
                 client = openai.OpenAI(api_key=self.api_key)
                 response = client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=self.openai_model,
                     messages=[
-                        {"role": "system", "content": "You are a helpful assistant. Use the provided context to answer questions."},
-                        {"role": "user", "content": prompt}
-                    ]
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
                 )
-                answer_text = response.choices[0].message.content
+                answer_text = (response.choices[0].message.content or "").strip()
+            elif self.provider == "ollama":
+                answer_text = self._generate_with_ollama(system_prompt, user_prompt)
             else:
-                answer_text = f"Unsupported provider: {self.provider}"
-        except Exception as e:
-            answer_text = f"Error calling LLM API: {str(e)}"
+                return {
+                    "text": f"Unsupported LLM provider: {self.provider}",
+                    "sources": sources,
+                    "confidence": optimized_chunks[0].get("score", 0.0),
+                    "used_llm": False,
+                    "fallback_reason": "unsupported_provider",
+                }
+        except Exception as exc:
+            return {
+                "text": f"LLM generation failed: {str(exc)}",
+                "sources": sources,
+                "confidence": optimized_chunks[0].get("score", 0.0),
+                "used_llm": False,
+                "fallback_reason": "llm_error",
+            }
+
+        if not answer_text:
+            return {
+                "text": "LLM returned an empty answer.",
+                "sources": sources,
+                "confidence": optimized_chunks[0].get("score", 0.0),
+                "used_llm": False,
+                "fallback_reason": "empty_llm_response",
+            }
 
         return {
             "text": answer_text,
             "sources": sources,
-            "confidence": chunks[0].get("score", 0.0) if chunks else 0.0
+            "confidence": optimized_chunks[0].get("score", 0.0),
+            "used_llm": True,
         }
+
+    def _generate_with_ollama(self, system_prompt: str, user_prompt: str) -> str:
+        """Generate an answer using a local Ollama model."""
+        payload = {
+            "model": self.ollama_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "stream": False,
+        }
+
+        request = urllib.request.Request(
+            f"{self.ollama_base_url.rstrip('/')}/api/chat",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except urllib.error.URLError as exc:
+            raise RuntimeError(
+                "Could not reach Ollama. Make sure the Ollama server is running."
+            ) from exc
+
+        message = body.get("message", {})
+        answer_text = (message.get("content") or "").strip()
+        if not answer_text:
+            raise RuntimeError("Ollama returned an empty response.")
+        return answer_text

@@ -46,9 +46,13 @@ enable_query_rewriting: false
 max_synonyms: 3
 
 # --- Generation ---
-mode: "extractive"       # "extractive" or "hybrid"
-llm_provider: null       # "google" or "openai" (only for hybrid)
-llm_api_key: null
+mode: "hybrid"           # "hybrid" or "extractive"
+llm_provider: "ollama"   # "ollama", "google", or "openai"
+llm_api_key: null        # can also come from OPENAI_API_KEY / GOOGLE_API_KEY / GEMINI_API_KEY
+openai_model: "gpt-4o-mini"
+google_model: "gemini-1.5-flash"
+ollama_model: "phi3:mini"
+ollama_base_url: "http://localhost:11434"
 max_context_tokens: 4000 # context window limit for LLM
 
 # --- Evaluation ---

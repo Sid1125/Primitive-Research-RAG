@@ -96,12 +96,15 @@ def cmd_query(args, config):
 
     if mode == "hybrid":
         answer = LLMGenerator(config).generate(args.question, results)
-        print(answer["text"])
-        if answer["sources"]:
-            print("\nSources:")
-            for source in answer["sources"]:
-                print(f"- {source}")
-        return
+        if answer.get("used_llm"):
+            print(answer["text"])
+            if answer["sources"]:
+                print("\nSources:")
+                for source in answer["sources"]:
+                    print(f"- {source}")
+            return
+
+        print("[INFO] Hybrid generation unavailable, falling back to extractive answering.\n")
 
     answer = ExtractiveQA().answer(args.question, results)
     print(answer["answer"])
@@ -111,11 +114,6 @@ def cmd_query(args, config):
             print(f"- {source}")
 
     print()
-    #for i, result in enumerate(results, 1):
-        #print(f"--- Result {i} (score: {result['score']:.4f}) ---")
-        #print(f"Source: {result['source']} | Page: {result['page']}")
-        #print(f"{result['text'][:500]}")
-        #print()
 
 
 def cmd_train(args, config):
