@@ -5,7 +5,7 @@ Generates positive/negative pairs and trains the embedding model.
 
 import json
 import os
-from typing import Dict, List
+from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
@@ -147,14 +147,20 @@ class Trainer:
             f"Missing processed chunks at {self.processed_chunks_path}. Run ingest first."
         )
 
-    def train(self):
+    def train(self, progress_callback: Optional[Callable[[str], None]] = None):
         """Run the full training pipeline."""
         from src.embedding.model import build_siamese_model, contrastive_loss
 
+        def notify(message: str):
+            if progress_callback:
+                progress_callback(message)
+
         chunks = self._load_chunks()
         print(f"[TRAIN] Loaded {len(chunks)} chunks")
+        notify("Loading processed chunks")
 
         print("[TRAIN] Building vocabulary")
+        notify("Building vocabulary")
         vocab = Vocabulary(max_size=self.config.get("vocab_size", 20000))
         vocab.build([self._training_text(chunk) for chunk in chunks])
 
@@ -163,6 +169,7 @@ class Trainer:
         vocab.save(os.path.join(model_save_path, "vocab.json"))
 
         print("[TRAIN] Generating pairs")
+        notify("Generating training pairs")
         texts_a, texts_b, labels = self.generate_pairs(chunks)
         print(f"[TRAIN] Generated {len(labels)} pairs ({sum(labels)} positive)")
         if not labels:
@@ -174,6 +181,7 @@ class Trainer:
         labels_arr = np.array(labels, dtype=np.float32)
 
         print("[TRAIN] Building model")
+        notify("Building Siamese model")
         siamese, encoder = build_siamese_model(
             vocab_size=vocab.size,
             embedding_dim=self.config.get("embedding_dim", 128),
@@ -185,20 +193,37 @@ class Trainer:
         siamese.compile(optimizer="adam", loss=contrastive_loss, metrics=["accuracy"])
 
         print("[TRAIN] Starting training loop")
+        notify("Preparing training loop")
         validation_split = 0.2 if len(labels_arr) >= 5 else 0.0
+
+        callbacks = []
+        if progress_callback:
+            from tensorflow.keras.callbacks import Callback
+
+            total_epochs = self.config.get("epochs", 20)
+
+            class ProgressCallback(Callback):
+                def on_epoch_begin(self, epoch, logs=None):
+                    progress_callback(f"Running epoch {epoch + 1}/{total_epochs}")
+
+            callbacks.append(ProgressCallback())
+
         siamese.fit(
             [seqs_a, seqs_b],
             labels_arr,
             batch_size=min(self.config.get("batch_size", 32), len(labels_arr)),
             epochs=self.config.get("epochs", 20),
             validation_split=validation_split,
+            callbacks=callbacks,
         )
 
         encoder_path = os.path.join(model_save_path, "encoder.keras")
+        notify("Saving trained encoder")
         encoder.save(encoder_path)
         print(f"[TRAIN] Model saved to {encoder_path}")
 
         print("[TRAIN] Rebuilding vector store with trained encoder")
+        notify("Rebuilding vector store")
         chunk_sequences = np.array(
             [vocab.encode(self._training_text(chunk), max_len) for chunk in chunks]
         )
@@ -207,3 +232,4 @@ class Trainer:
         store.add_all(chunks, vectors)
         store.save()
         print(f"[TRAIN] Vector store saved to {self.config['vector_store_path']}")
+        notify("Training complete")

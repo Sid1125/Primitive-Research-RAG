@@ -34,6 +34,12 @@ py -3.11 -m main train
 py -3.11 -m main query "What is Amazon API Gateway?"
 ```
 
+For the interactive frontend:
+
+```powershell
+streamlit run app.py
+```
+
 After the first `ingest` and `train`, you usually only need:
 
 ```powershell
@@ -304,7 +310,15 @@ py -3.11 -m main query "What is machine learning?"
 
 If Ollama is not running, or no API key is available for cloud providers, the system still answers using extractive fallback mode.
 
-### 7. Day-to-Day Workflow
+### 7. Launch the Frontend
+
+The project includes a Streamlit dashboard with PDF upload, ingest, training, RAG chat, and pure LLM chat modes.
+
+```powershell
+streamlit run app.py
+```
+
+### 8. Day-to-Day Workflow
 
 For normal use:
 

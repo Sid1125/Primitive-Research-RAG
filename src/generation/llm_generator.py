@@ -81,35 +81,12 @@ class LLMGenerator:
         )
 
         try:
-            if self.provider == "google":
-                import google.generativeai as genai
-
-                genai.configure(api_key=self.api_key)
-                model = genai.GenerativeModel(self.google_model)
-                response = model.generate_content([system_prompt, user_prompt])
-                answer_text = (response.text or "").strip()
-            elif self.provider == "openai":
-                import openai
-
-                client = openai.OpenAI(api_key=self.api_key)
-                response = client.chat.completions.create(
-                    model=self.openai_model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                )
-                answer_text = (response.choices[0].message.content or "").strip()
-            elif self.provider == "ollama":
-                answer_text = self._generate_with_ollama(system_prompt, user_prompt)
-            else:
-                return {
-                    "text": f"Unsupported LLM provider: {self.provider}",
-                    "sources": sources,
-                    "confidence": optimized_chunks[0].get("score", 0.0),
-                    "used_llm": False,
-                    "fallback_reason": "unsupported_provider",
-                }
+            answer_text = self._run_chat(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ]
+            )
         except Exception as exc:
             return {
                 "text": f"LLM generation failed: {str(exc)}",
@@ -135,14 +112,78 @@ class LLMGenerator:
             "used_llm": True,
         }
 
-    def _generate_with_ollama(self, system_prompt: str, user_prompt: str) -> str:
+    def chat(self, prompt: str, system_prompt: str = None) -> Dict:
+        """Run a general-purpose chat request without document retrieval."""
+        system_prompt = system_prompt or (
+            "You are a sharp AI research assistant. "
+            "Give concise, clear, and useful answers. "
+            "If asked about the uploaded documents, explain that no relevant document context was provided."
+        )
+
+        if self.provider in {"openai", "google"} and not self.api_key:
+            return {
+                "text": "LLM API key missing.",
+                "sources": [],
+                "confidence": 0.0,
+                "used_llm": False,
+                "fallback_reason": "missing_api_key",
+            }
+
+        try:
+            answer_text = self._run_chat(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ]
+            )
+        except Exception as exc:
+            return {
+                "text": f"LLM generation failed: {str(exc)}",
+                "sources": [],
+                "confidence": 0.0,
+                "used_llm": False,
+                "fallback_reason": "llm_error",
+            }
+
+        return {
+            "text": answer_text,
+            "sources": [],
+            "confidence": 0.0,
+            "used_llm": True,
+        }
+
+    def _run_chat(self, messages: List[Dict[str, str]]) -> str:
+        """Dispatch a chat request to the configured provider."""
+        if self.provider == "google":
+            import google.generativeai as genai
+
+            genai.configure(api_key=self.api_key)
+            model = genai.GenerativeModel(self.google_model)
+            response = model.generate_content([message["content"] for message in messages])
+            answer_text = (response.text or "").strip()
+        elif self.provider == "openai":
+            import openai
+
+            client = openai.OpenAI(api_key=self.api_key)
+            response = client.chat.completions.create(
+                model=self.openai_model,
+                messages=messages,
+            )
+            answer_text = (response.choices[0].message.content or "").strip()
+        elif self.provider == "ollama":
+            answer_text = self._generate_with_ollama(messages)
+        else:
+            raise RuntimeError(f"Unsupported LLM provider: {self.provider}")
+
+        if not answer_text:
+            raise RuntimeError("The configured LLM returned an empty response.")
+        return answer_text
+
+    def _generate_with_ollama(self, messages: List[Dict[str, str]]) -> str:
         """Generate an answer using a local Ollama model."""
         payload = {
             "model": self.ollama_model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            "messages": messages,
             "stream": False,
         }
 
